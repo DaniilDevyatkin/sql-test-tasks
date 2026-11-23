@@ -1,0 +1,503 @@
+==============================================================================
+#58 Добавить отзыв с рейтингом 5
+INSERT INTO reviews (id, reservation_id, rating) SELECT (SELECT COUNT(*) + 1 FROM reviews), r.id, 5 FROM rooms rm JOIN reservations r ON r.room_id = rm.id JOIN users u ON u.id = r.user_id WHERE rm.address = '11218, Friel Place, New York' AND u.name = 'George Clooney' ORDER BY r.id LIMIT 1 RETURNING *;
+------------------------------------------------------------------------------
+ id | reservation_id | rating 
+----+----------------+--------
+ 23 |              2 |      5
+==============================================================================
+#59 Пользователи с белорусским номером (+375)
+SELECT * FROM users WHERE phone_number LIKE '+375%' ORDER BY id;
+------------------------------------------------------------------------------
+ id |     name     |       email       |  email_verified_at  |       password       |   phone_number    
+----+--------------+-------------------+---------------------+----------------------+-------------------
+ 31 | Bruce Willis | kewley@icloud.com | 2016-12-08 20:18:59 | 0ofa2khvnptiackbssv0 | +375 154 771 3462
+ 32 | Mullah Omar  | jgoerzen@me.com   | 2019-07-18 06:50:42 | f3ft4fwo7vafvqb0ugk5 | +375 154 802 9505
+==============================================================================
+#61 Комнаты, забронированные хотя бы на сутки в 12-ю неделю 2020 (1–7 января = неделя 1)
+SELECT r.* FROM rooms r WHERE r.id IN (SELECT res.room_id FROM reservations res WHERE res.start_date < TIMESTAMP '2020-03-25 00:00:00' AND res.end_date > TIMESTAMP '2020-03-18 00:00:00') ORDER BY r.id;
+------------------------------------------------------------------------------
+ id |    home_type    |             address              | has_tv | has_internet | has_kitchen | has_air_con | price | owner_id | latitude | longitude 
+----+-----------------+----------------------------------+--------+--------------+-------------+-------------+-------+----------+----------+-----------
+  2 | Entire home/apt | 10018, 6th Avenue, New York      |      0 |            1 |           1 |           1 |   225 |        1 |  40.7536 |  -73.9838
+ 13 | Private room    | 11215, 11th Street, New York     |      0 |            0 |           0 |           0 |    89 |       11 |  40.6683 |  -73.9878
+ 38 | Entire home/apt | 11237, Troutman Street, New York |      1 |            0 |           1 |           0 |    85 |        1 |  40.7019 |  -73.9275
+==============================================================================
+#62 Домены второго уровня почты по убыванию популярности
+SELECT substring(u.email FROM '[^@]+$') AS domain, COUNT(*) AS count FROM users u GROUP BY domain ORDER BY count DESC, domain ASC;
+------------------------------------------------------------------------------
+      domain      | count 
+------------------+-------
+ hotmail.com      |     5
+ live.com         |     4
+ verizon.net      |     4
+ icloud.com       |     3
+ me.com           |     3
+ att.net          |     2
+ msn.com          |     2
+ outlook.com      |     2
+ yahoo.ca         |     2
+ aol.com          |     1
+ comcast.net      |     1
+ optonline.net    |     1
+ sbcglobal.net    |     1
+ sql-academy.org  |     1
+ superhotmail.com |     1
+==============================================================================
+#64 Количество бронирований по месяцам годам
+SELECT EXTRACT(YEAR FROM start_date)::int AS year, EXTRACT(MONTH FROM start_date)::int AS month, COUNT(*)::int AS amount FROM reservations GROUP BY 1, 2 ORDER BY 1, 2;
+------------------------------------------------------------------------------
+ year | month | amount 
+------+-------+--------
+ 2018 |    10 |      1
+ 2018 |    11 |      1
+ 2018 |    12 |      1
+ 2019 |     2 |      2
+ 2019 |     5 |      1
+ 2019 |     6 |      1
+ 2019 |     9 |      3
+ 2019 |    11 |      5
+ 2019 |    12 |      1
+ 2020 |     1 |      3
+ 2020 |     2 |      2
+ 2020 |     3 |      4
+ 2020 |     4 |      2
+ 2020 |     5 |      2
+ 2020 |     6 |      1
+==============================================================================
+#65 Средний рейтинг комнат (floor) среди тех, что сдавались
+SELECT r.room_id, FLOOR(AVG(rev.rating))::int AS rating FROM reservations r JOIN reviews rev ON rev.reservation_id = r.id GROUP BY r.room_id ORDER BY r.room_id;
+------------------------------------------------------------------------------
+ room_id | rating 
+---------+--------
+       1 |      4
+       5 |      2
+       7 |      4
+       8 |      5
+      14 |      1
+      16 |      4
+      17 |      4
+      19 |      3
+      21 |      2
+      38 |      3
+      39 |      2
+      48 |      5
+      49 |      4
+      50 |      5
+==============================================================================
+#66 Комнаты со всеми удобствами: дни и сумма аренды
+SELECT rm.home_type, rm.address, COALESCE(SUM(EXTRACT(EPOCH FROM (res.end_date - res.start_date)) / 86400), 0)::int AS days, COALESCE(SUM(res.total), 0)::int AS total_fee FROM rooms rm LEFT JOIN reservations res ON res.room_id = rm.id WHERE rm.has_tv = 1 AND rm.has_internet = 1 AND rm.has_kitchen = 1 AND rm.has_air_con = 1 GROUP BY rm.id, rm.home_type, rm.address ORDER BY rm.id;
+------------------------------------------------------------------------------
+    home_type    |              address              | days | total_fee 
+-----------------+-----------------------------------+------+-----------
+ Entire home/apt | 11216, Bergen Street, New York    |   19 |      1881
+ Entire home/apt | 11249, North 8th Street, New York |    6 |      1660
+ Private room    | 11217, 5th Avenue, New York       |    0 |         0
+ Shared room     | 10002, East Broadway, New York    |    0 |         0
+==============================================================================
+#68 Последний арендатор каждой комнаты и дата выезда
+SELECT last.room_id, u.name, last.end_date FROM (SELECT DISTINCT ON (room_id) room_id, user_id, end_date FROM reservations ORDER BY room_id, end_date DESC, id DESC) last JOIN users u ON u.id = last.user_id ORDER BY last.room_id;
+------------------------------------------------------------------------------
+ room_id |         name         |      end_date       
+---------+----------------------+---------------------
+       1 | Michael Douglas      | 2019-02-04 12:00:00
+       2 | Michael Caine        | 2020-03-23 09:00:00
+       5 | Russell Crowe        | 2020-05-15 10:00:00
+       7 | Steve Martin         | 2019-09-17 10:00:00
+       8 | Angelina Jolie       | 2020-01-21 12:00:00
+      13 | Sylvester Stallone   | 2020-04-21 10:00:00
+      14 | Catherine Zeta-Jones | 2020-02-12 10:00:00
+      16 | Pierce Brosnan       | 2019-06-24 10:00:00
+      17 | Catherine Zeta-Jones | 2019-11-05 09:00:00
+      19 | Samuel L. Jackson    | 2020-05-02 10:00:00
+      21 | Alan Rickman         | 2020-02-29 10:00:00
+      25 | Bruce Willis         | 2020-04-22 09:00:00
+      32 | Russell Crowe        | 2020-01-18 13:00:00
+      38 | Kevin Costner        | 2020-03-23 10:00:00
+      39 | Catherine Zeta-Jones | 2019-12-09 10:00:00
+      48 | George Clooney       | 2019-11-10 10:00:00
+      49 | Bruce Willis         | 2020-06-11 10:00:00
+      50 | Harrison Ford        | 2019-11-25 11:00:00
+==============================================================================
+#69 Заработок владельцев комнат
+SELECT rm.owner_id, COALESCE(SUM(res.total), 0)::int AS total_earn FROM rooms rm JOIN reservations res ON res.room_id = rm.id GROUP BY rm.owner_id ORDER BY rm.owner_id;
+------------------------------------------------------------------------------
+ owner_id | total_earn 
+----------+------------
+        1 |       3708
+        3 |        160
+        4 |        240
+       11 |       2679
+       12 |        340
+       14 |       1556
+       15 |       2475
+       16 |        330
+       17 |       1881
+       19 |       1660
+       23 |        240
+       25 |        150
+       30 |        260
+==============================================================================
+#70 Категории жилья по цене
+SELECT CASE WHEN price <= 100 THEN 'economy' WHEN price >= 200 THEN 'premium' ELSE 'comfort' END AS category, COUNT(*)::int AS count FROM rooms GROUP BY category ORDER BY count DESC, category;
+------------------------------------------------------------------------------
+ category | count 
+----------+-------
+ economy  |    24
+ comfort  |    22
+ premium  |     4
+==============================================================================
+#71 Процент активных пользователей (арендовали или сдавали)
+SELECT ROUND(100.0 * COUNT(DISTINCT u.id) / (SELECT COUNT(*) FROM users), 2) AS percent FROM users u WHERE u.id IN (SELECT user_id FROM reservations) OR u.id IN (SELECT owner_id FROM rooms);
+------------------------------------------------------------------------------
+ percent 
+---------
+   93.94
+==============================================================================
+#72 Средняя цена суток по комнатам (ceil)
+SELECT room_id, CEIL(AVG(price))::int AS avg_price FROM reservations GROUP BY room_id ORDER BY room_id;
+------------------------------------------------------------------------------
+ room_id | avg_price 
+---------+-----------
+       1 |       147
+       2 |       225
+       5 |        80
+       7 |        60
+       8 |        78
+      13 |        89
+      14 |        85
+      16 |       140
+      17 |       215
+      19 |        99
+      21 |       280
+      25 |       120
+      32 |        52
+      38 |       185
+      39 |       150
+      48 |       110
+      49 |       114
+      50 |        80
+==============================================================================
+#73 Комнаты, арендованные нечётное число раз
+SELECT room_id, COUNT(*)::int AS count FROM reservations GROUP BY room_id HAVING COUNT(*) % 2 = 1 ORDER BY room_id;
+------------------------------------------------------------------------------
+ room_id | count 
+---------+-------
+       1 |     5
+       2 |     1
+       7 |     1
+       8 |     1
+      13 |     1
+      14 |     1
+      16 |     1
+      17 |     1
+      19 |     3
+      21 |     3
+      25 |     1
+      38 |     1
+      39 |     1
+      48 |     1
+      49 |     3
+      50 |     1
+==============================================================================
+#74 Признак наличия интернета у жилья
+SELECT id, CASE WHEN has_internet = 1 THEN 'YES' ELSE 'NO' END AS has_internet FROM rooms ORDER BY id;
+------------------------------------------------------------------------------
+ id | has_internet 
+----+--------------
+  1 | YES
+  2 | YES
+  3 | NO
+  4 | NO
+  5 | YES
+  6 | YES
+  7 | NO
+  8 | NO
+  9 | NO
+ 10 | NO
+ 11 | YES
+ 12 | NO
+ 13 | NO
+ 14 | NO
+ 15 | NO
+ 16 | NO
+ 17 | NO
+ 18 | YES
+ 19 | YES
+ 20 | NO
+ 21 | YES
+ 22 | NO
+ 23 | YES
+ 24 | YES
+ 25 | NO
+ 26 | YES
+ 27 | YES
+ 28 | YES
+ 29 | NO
+ 30 | YES
+ 31 | NO
+ 32 | NO
+ 33 | YES
+ 34 | NO
+ 35 | NO
+ 36 | NO
+ 37 | YES
+ 38 | NO
+ 39 | YES
+ 40 | YES
+ 41 | NO
+ 42 | YES
+ 43 | NO
+ 44 | YES
+ 45 | YES
+ 46 | NO
+ 47 | NO
+ 48 | YES
+ 49 | YES
+ 50 | NO
+==============================================================================
+#76 Пользователи и признаки owner/tenant
+SELECT u.name, CASE WHEN EXISTS (SELECT 1 FROM rooms rm WHERE rm.owner_id = u.id) THEN 1 ELSE 0 END AS is_owner, CASE WHEN EXISTS (SELECT 1 FROM reservations res WHERE res.user_id = u.id) THEN 1 ELSE 0 END AS is_tenant FROM users u ORDER BY u.id;
+------------------------------------------------------------------------------
+         name         | is_owner | is_tenant 
+----------------------+----------+-----------
+ Bruce Willis         |        1 |         1
+ George Clooney       |        1 |         1
+ Kevin Costner        |        1 |         1
+ Donald Sutherland    |        1 |         0
+ Jennifer Lopez       |        0 |         0
+ Ray Liotta           |        1 |         0
+ Samuel L. Jackson    |        1 |         1
+ Nikole Kidman        |        1 |         0
+ Alan Rickman         |        0 |         1
+ Kurt Russell         |        1 |         1
+ Harrison Ford        |        1 |         1
+ Russell Crowe        |        1 |         1
+ Steve Martin         |        1 |         1
+ Michael Caine        |        1 |         1
+ Angelina Jolie       |        1 |         1
+ Mel Gibson           |        1 |         0
+ Michael Douglas      |        1 |         1
+ John Travolta        |        1 |         1
+ Sylvester Stallone   |        1 |         1
+ Tommy Lee Jones      |        1 |         0
+ Catherine Zeta-Jones |        1 |         1
+ Antonio Banderas     |        1 |         0
+ Kim Basinger         |        1 |         0
+ Sam Neill            |        1 |         0
+ Hideo Kojima         |        1 |         0
+ ClINT Eastwood       |        1 |         0
+ Brad Pitt            |        1 |         1
+ Johnny Depp          |        1 |         1
+ Pierce Brosnan       |        1 |         1
+ Sean Connery         |        1 |         0
+ Bruce Willis         |        1 |         1
+ Mullah Omar          |        1 |         1
+ Vasanta Roberta      |        0 |         0
+==============================================================================
+#78 Пользователи с hotmail.com
+SELECT * FROM users WHERE email LIKE '%@hotmail.com' ORDER BY id;
+------------------------------------------------------------------------------
+ id |         name         |        email         |  email_verified_at  |       password       |   phone_number   
+----+----------------------+----------------------+---------------------+----------------------+------------------
+  1 | Bruce Willis         | barjam@hotmail.com   |                     | o8sdffsmgtswxjvxxl31 | +1 202 555 0128
+  5 | Jennifer Lopez       | barjam@hotmail.com   | 2016-03-02 09:35:57 | c70n1nz39ggc9881ybst | +1 202 555 0145
+ 11 | Harrison Ford        | kostas@hotmail.com   | 2016-12-05 07:35:14 | u8sxb8byhaajee65n9t2 | +1 202 555 0124
+ 17 | Michael Douglas      | timtroyr@hotmail.com | 2016-08-02 12:50:51 | 03ga9r324u8n25ujb5ue | +1 202 555 0106
+ 21 | Catherine Zeta-Jones | flakeg@hotmail.com   | 2016-04-02 12:28:19 | izq356fwuzdhc6u1skan | +353 20 911 3955
+==============================================================================
+#79 id, home_type, price со скидкой 10% при наличии ТВ и интернета
+SELECT id, home_type, CASE WHEN has_tv = 1 AND has_internet = 1 THEN price * 0.9 ELSE price END AS price FROM rooms ORDER BY id;
+------------------------------------------------------------------------------
+ id |    home_type    | price 
+----+-----------------+-------
+  1 | Private room    | 134.1
+  2 | Entire home/apt |   225
+  3 | Private room    |   150
+  4 | Entire home/apt |    89
+  5 | Entire home/apt |    80
+  6 | Entire home/apt |   200
+  7 | Private room    |    60
+  8 | Private room    |    79
+  9 | Private room    |    79
+ 10 | Entire home/apt |   150
+ 11 | Entire home/apt | 121.5
+ 12 | Private room    |    85
+ 13 | Private room    |    89
+ 14 | Private room    |    85
+ 15 | Entire home/apt |   120
+ 16 | Entire home/apt |   140
+ 17 | Entire home/apt |   215
+ 18 | Private room    | 126.0
+ 19 | Entire home/apt |  89.1
+ 20 | Entire home/apt |   190
+ 21 | Entire home/apt | 269.1
+ 22 | Private room    |   130
+ 23 | Private room    |  72.0
+ 24 | Private room    |  99.0
+ 25 | Entire home/apt |   120
+ 26 | Private room    |  54.0
+ 27 | Private room    |  72.0
+ 28 | Entire home/apt | 135.0
+ 29 | Private room    |    44
+ 30 | Entire home/apt |   180
+ 31 | Private room    |    50
+ 32 | Private room    |    52
+ 33 | Private room    |    55
+ 34 | Private room    |    50
+ 35 | Private room    |    70
+ 36 | Private room    |    89
+ 37 | Private room    |    35
+ 38 | Entire home/apt |    85
+ 39 | Private room    |   150
+ 40 | Shared room     |  36.0
+ 41 | Private room    |    68
+ 42 | Entire home/apt | 108.0
+ 43 | Private room    |   120
+ 44 | Private room    |   135
+ 45 | Entire home/apt |   150
+ 46 | Entire home/apt |   150
+ 47 | Private room    |   130
+ 48 | Entire home/apt |  99.0
+ 49 | Entire home/apt | 103.5
+ 50 | Private room    |    80
+==============================================================================
+#80 Представление Verified_Users
+CREATE OR REPLACE VIEW "verified_users" AS SELECT id, name, email FROM users WHERE email_verified_at IS NOT NULL; SELECT id, name, email FROM "verified_users" ORDER BY id;
+------------------------------------------------------------------------------
+ id |         name         |          email          
+----+----------------------+-------------------------
+  2 | George Clooney       | tellis@me.com
+  3 | Kevin Costner        | metzzo@superhotmail.com
+  4 | Donald Sutherland    | ralamosm@verizon.net
+  5 | Jennifer Lopez       | barjam@hotmail.com
+  6 | Ray Liotta           | jdhedden@comcast.net
+  7 | Samuel L. Jackson    | moonlapse@outlook.com
+  8 | Nikole Kidman        | okroeger@msn.com
+  9 | Alan Rickman         | karasik@verizon.net
+ 10 | Kurt Russell         | gator@live.com
+ 11 | Harrison Ford        | kostas@hotmail.com
+ 12 | Russell Crowe        | glenz@att.net
+ 13 | Steve Martin         | nelson@outlook.com
+ 14 | Michael Caine        | dmouse@live.com
+ 16 | Mel Gibson           | rohitm@yahoo.ca
+ 17 | Michael Douglas      | timtroyr@hotmail.com
+ 18 | John Travolta        | wainwrig@msn.com
+ 19 | Sylvester Stallone   | kohlis@aol.com
+ 20 | Tommy Lee Jones      | szymansk@live.com
+ 21 | Catherine Zeta-Jones | flakeg@hotmail.com
+ 22 | Antonio Banderas     | sassen@verizon.net
+ 23 | Kim Basinger         | jaesenj@sbcglobal.net
+ 24 | Sam Neill            | clkao@live.com
+ 25 | Hideo Kojima         | admin@sql-academy.org
+ 26 | ClINT Eastwood       | froodian@verizon.net
+ 27 | Brad Pitt            | kewley@optonline.net
+ 28 | Johnny Depp          | cgarcia@yahoo.ca
+ 29 | Pierce Brosnan       | treeves@icloud.com
+ 30 | Sean Connery         | jschauma@icloud.com
+ 31 | Bruce Willis         | kewley@icloud.com
+ 32 | Mullah Omar          | jgoerzen@me.com
+ 33 | Vasanta Roberta      | roberta@me.com
+==============================================================================
+#93 Alfabank: средний возраст покупателей Smartwatch в 2024
+SELECT AVG(c.age)::numeric(10,1) AS average_age FROM purchases p JOIN products pr ON pr.product_key = p.product_key JOIN customers c ON c.customer_key = p.customer_key WHERE pr.name = 'Smartwatch' AND EXTRACT(YEAR FROM p.date) = 2024;
+------------------------------------------------------------------------------
+ average_age 
+-------------
+        28.0
+==============================================================================
+#94 Alfabank: купившие Laptop и Monitor в марте 2024
+SELECT c.name FROM customers c JOIN purchases p ON p.customer_key = c.customer_key JOIN products pr ON pr.product_key = p.product_key WHERE EXTRACT(YEAR FROM p.date) = 2024 AND EXTRACT(MONTH FROM p.date) = 3 AND pr.name IN ('Laptop', 'Monitor') GROUP BY c.name HAVING COUNT(DISTINCT pr.name) = 2 ORDER BY c.name;
+------------------------------------------------------------------------------
+ name  
+-------
+ Eve
+ Frank
+ Isaac
+==============================================================================
+#97 Samokat: работающие склады по городам (>80)
+SELECT city, COUNT(*)::int AS warehouse_count FROM warehouses WHERE date_open <= CURRENT_DATE AND (date_close IS NULL OR date_close > CURRENT_DATE) GROUP BY city HAVING COUNT(*) > 80 ORDER BY city;
+------------------------------------------------------------------------------
+    city     | warehouse_count 
+-------------+-----------------
+ Moscow      |              88
+ Novosibirsk |              84
+==============================================================================
+#99 VK: доход с женской аудитории
+SELECT SUM(items * price)::int AS income_from_female FROM purchases WHERE user_gender IN ('female', 'f');
+------------------------------------------------------------------------------
+ income_from_female 
+--------------------
+              10483
+==============================================================================
+#101 VK: первый по времени товар каждого пользователя
+SELECT DISTINCT ON (user_id) user_id, item FROM transactions ORDER BY user_id, transaction_ts, transaction_id;
+------------------------------------------------------------------------------
+ user_id |   item   
+---------+----------
+ 1883712 | pant
+ 4312667 | ruler
+ 4341574 | mirror
+ 4412678 | dress
+ 4781860 | notebook
+ 4939867 | tie
+ 5098345 | ruler
+ 5215642 | mirror
+ 5286808 | cup
+ 5545695 | eraser
+ 5990422 | notebook
+ 7027696 | vase
+ 7443543 | laptop
+ 7568463 | bag
+ 7874603 | pen
+ 8496052 | pencil
+ 8557889 | lamp
+ 8584107 | tie
+ 8783745 | vase
+ 9109140 | pencil
+ 9603912 | lamp
+ 9676738 | tablet
+==============================================================================
+#103 Сбер: сотрудники с зарплатой выше руководителя
+SELECT e.name FROM employees e JOIN employees chief ON chief.id = e.chief_id WHERE e.salary > chief.salary ORDER BY e.name;
+------------------------------------------------------------------------------
+       name        
+-------------------
+ Aaron Vaughan
+ Adrian Zavala
+ Amanda Rivera
+ Angela Frye
+ Belinda Anderson
+ Brian Hawkins
+ Erik Lambert
+ Gregory Young
+ James Kim
+ Jenna Carr
+ Melody Henderson
+ Patrick Whitehead
+ Tyler Nelson
+==============================================================================
+#109 ДомКлик: страна города Salzburg
+SELECT co.name AS country_name FROM cities c JOIN regions r ON r.id = c.regionid JOIN countries co ON co.id = r.countryid::int WHERE c.name = 'Salzburg';
+------------------------------------------------------------------------------
+ country_name 
+--------------
+ Austria
+==============================================================================
+#111 ДомКлик: население регионов
+SELECT r.name AS region_name, SUM(c.population)::int AS total_population FROM regions r JOIN cities c ON c.regionid = r.id GROUP BY r.name ORDER BY total_population DESC, r.name;
+------------------------------------------------------------------------------
+       region_name       | total_population 
+-------------------------+------------------
+ Moscow region           |         13000000
+ Berlin                  |          7216968
+ Saint Petersburg region |          5500000
+ Bavaria                 |          3376251
+ Kyiv region             |          2884000
+ Tyrol                   |          2183211
+ Almaty region           |          1850000
+ Lviv region             |          1487984
+ Nur-Sultan region       |          1100000
+ Styria                  |           300000
+==============================================================================
+tasks: 26, failures: 0

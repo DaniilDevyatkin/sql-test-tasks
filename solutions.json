@@ -1,0 +1,109 @@
+{
+  "74": {
+    "title": "Признак наличия интернета у жилья",
+    "sql": "SELECT id, CASE WHEN has_internet = 1 THEN 'YES' ELSE 'NO' END AS has_internet FROM rooms ORDER BY id;"
+  },
+  "59": {
+    "title": "Пользователи с белорусским номером (+375)",
+    "sql": "SELECT * FROM users WHERE phone_number LIKE '+375%' ORDER BY id;"
+  },
+  "61": {
+    "title": "Комнаты, забронированные хотя бы на сутки в 12-ю неделю 2020 (1–7 января = неделя 1)",
+    "sql": "SELECT r.* FROM rooms r WHERE r.id IN (SELECT res.room_id FROM reservations res WHERE res.start_date < TIMESTAMP '2020-03-25 00:00:00' AND res.end_date > TIMESTAMP '2020-03-18 00:00:00') ORDER BY r.id;"
+  },
+  "62": {
+    "title": "Домены второго уровня почты по убыванию популярности",
+    "sql": "SELECT substring(u.email FROM '[^@]+$') AS domain, COUNT(*) AS count FROM users u GROUP BY domain ORDER BY count DESC, domain ASC;"
+  },
+  "64": {
+    "title": "Количество бронирований по месяцам годам",
+    "sql": "SELECT EXTRACT(YEAR FROM start_date)::int AS year, EXTRACT(MONTH FROM start_date)::int AS month, COUNT(*)::int AS amount FROM reservations GROUP BY 1, 2 ORDER BY 1, 2;"
+  },
+  "65": {
+    "title": "Средний рейтинг комнат (floor) среди тех, что сдавались",
+    "sql": "SELECT r.room_id, FLOOR(AVG(rev.rating))::int AS rating FROM reservations r JOIN reviews rev ON rev.reservation_id = r.id GROUP BY r.room_id ORDER BY r.room_id;"
+  },
+  "66": {
+    "title": "Комнаты со всеми удобствами: дни и сумма аренды",
+    "sql": "SELECT rm.home_type, rm.address, COALESCE(SUM(EXTRACT(EPOCH FROM (res.end_date - res.start_date)) / 86400), 0)::int AS days, COALESCE(SUM(res.total), 0)::int AS total_fee FROM rooms rm LEFT JOIN reservations res ON res.room_id = rm.id WHERE rm.has_tv = 1 AND rm.has_internet = 1 AND rm.has_kitchen = 1 AND rm.has_air_con = 1 GROUP BY rm.id, rm.home_type, rm.address ORDER BY rm.id;"
+  },
+  "68": {
+    "title": "Последний арендатор каждой комнаты и дата выезда",
+    "sql": "SELECT last.room_id, u.name, last.end_date FROM (SELECT DISTINCT ON (room_id) room_id, user_id, end_date FROM reservations ORDER BY room_id, end_date DESC, id DESC) last JOIN users u ON u.id = last.user_id ORDER BY last.room_id;"
+  },
+  "69": {
+    "title": "Заработок владельцев комнат",
+    "sql": "SELECT rm.owner_id, COALESCE(SUM(res.total), 0)::int AS total_earn FROM rooms rm JOIN reservations res ON res.room_id = rm.id GROUP BY rm.owner_id ORDER BY rm.owner_id;"
+  },
+  "70": {
+    "title": "Категории жилья по цене",
+    "sql": "SELECT CASE WHEN price <= 100 THEN 'economy' WHEN price >= 200 THEN 'premium' ELSE 'comfort' END AS category, COUNT(*)::int AS count FROM rooms GROUP BY category ORDER BY count DESC, category;"
+  },
+  "71": {
+    "title": "Процент активных пользователей (арендовали или сдавали)",
+    "sql": "SELECT ROUND(100.0 * COUNT(DISTINCT u.id) / (SELECT COUNT(*) FROM users), 2) AS percent FROM users u WHERE u.id IN (SELECT user_id FROM reservations) OR u.id IN (SELECT owner_id FROM rooms);"
+  },
+  "72": {
+    "title": "Средняя цена суток по комнатам (ceil)",
+    "sql": "SELECT room_id, CEIL(AVG(price))::int AS avg_price FROM reservations GROUP BY room_id ORDER BY room_id;"
+  },
+  "73": {
+    "title": "Комнаты, арендованные нечётное число раз",
+    "sql": "SELECT room_id, COUNT(*)::int AS count FROM reservations GROUP BY room_id HAVING COUNT(*) % 2 = 1 ORDER BY room_id;"
+  },
+  "76": {
+    "title": "Пользователи и признаки owner/tenant",
+    "sql": "SELECT u.name, CASE WHEN EXISTS (SELECT 1 FROM rooms rm WHERE rm.owner_id = u.id) THEN 1 ELSE 0 END AS is_owner, CASE WHEN EXISTS (SELECT 1 FROM reservations res WHERE res.user_id = u.id) THEN 1 ELSE 0 END AS is_tenant FROM users u ORDER BY u.id;"
+  },
+  "78": {
+    "title": "Пользователи с hotmail.com",
+    "sql": "SELECT * FROM users WHERE email LIKE '%@hotmail.com' ORDER BY id;"
+  },
+  "79": {
+    "title": "id, home_type, price со скидкой 10% при наличии ТВ и интернета",
+    "sql": "SELECT id, home_type, CASE WHEN has_tv = 1 AND has_internet = 1 THEN price * 0.9 ELSE price END AS price FROM rooms ORDER BY id;"
+  },
+  "80": {
+    "title": "Представление Verified_Users",
+    "sql": "CREATE OR REPLACE VIEW \"verified_users\" AS SELECT id, name, email FROM users WHERE email_verified_at IS NOT NULL; SELECT id, name, email FROM \"verified_users\" ORDER BY id;"
+  },
+  "58": {
+    "title": "Добавить отзыв с рейтингом 5",
+    "sql": "INSERT INTO reviews (id, reservation_id, rating) SELECT (SELECT COUNT(*) + 1 FROM reviews), r.id, 5 FROM rooms rm JOIN reservations r ON r.room_id = rm.id JOIN users u ON u.id = r.user_id WHERE rm.address = '11218, Friel Place, New York' AND u.name = 'George Clooney' ORDER BY r.id LIMIT 1 RETURNING *;"
+  },
+  "93": {
+    "title": "Alfabank: средний возраст покупателей Smartwatch в 2024",
+    "sql": "SELECT AVG(c.age)::numeric(10,1) AS average_age FROM purchases p JOIN products pr ON pr.product_key = p.product_key JOIN customers c ON c.customer_key = p.customer_key WHERE pr.name = 'Smartwatch' AND EXTRACT(YEAR FROM p.date) = 2024;"
+  },
+  "94": {
+    "title": "Alfabank: купившие Laptop и Monitor в марте 2024",
+    "sql": "SELECT c.name FROM customers c JOIN purchases p ON p.customer_key = c.customer_key JOIN products pr ON pr.product_key = p.product_key WHERE EXTRACT(YEAR FROM p.date) = 2024 AND EXTRACT(MONTH FROM p.date) = 3 AND pr.name IN ('Laptop', 'Monitor') GROUP BY c.name HAVING COUNT(DISTINCT pr.name) = 2 ORDER BY c.name;"
+  },
+  "97": {
+    "title": "Samokat: работающие склады по городам (>80)",
+    "sql": "SELECT city, COUNT(*)::int AS warehouse_count FROM warehouses WHERE date_open <= CURRENT_DATE AND (date_close IS NULL OR date_close > CURRENT_DATE) GROUP BY city HAVING COUNT(*) > 80 ORDER BY city;"
+  },
+  "99": {
+    "title": "VK: доход с женской аудитории",
+    "sql": "SELECT SUM(items * price)::int AS income_from_female FROM purchases WHERE user_gender IN ('female', 'f');"
+  },
+  "101": {
+    "title": "VK: первый по времени товар каждого пользователя",
+    "sql": "SELECT DISTINCT ON (user_id) user_id, item FROM transactions ORDER BY user_id, transaction_ts, transaction_id;",
+    "bigints": [
+      "transaction_id"
+    ]
+  },
+  "103": {
+    "title": "Сбер: сотрудники с зарплатой выше руководителя",
+    "sql": "SELECT e.name FROM employees e JOIN employees chief ON chief.id = e.chief_id WHERE e.salary > chief.salary ORDER BY e.name;"
+  },
+  "109": {
+    "title": "ДомКлик: страна города Salzburg",
+    "sql": "SELECT co.name AS country_name FROM cities c JOIN regions r ON r.id = c.regionid JOIN countries co ON co.id = r.countryid::int WHERE c.name = 'Salzburg';"
+  },
+  "111": {
+    "title": "ДомКлик: население регионов",
+    "sql": "SELECT r.name AS region_name, SUM(c.population)::int AS total_population FROM regions r JOIN cities c ON c.regionid = r.id GROUP BY r.name ORDER BY total_population DESC, r.name;"
+  }
+}
